@@ -93,8 +93,7 @@ int main(int argc, char* argv[]) {
             client->sockfd = fd_array[connected_host];
             client->name_client = 'A' + connected_host;
             snprintf(message_connection_log, MAX_LENGTH_MSG, "Connessione avvenuta da parte della destinazione: %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));      // funzioni usate per mandare a video porta e ip del client.
-            printf("%s\n", message_connection_log);
-            printf("%s\nClient %c connesso\nClient %c fd: %d", message_connection_log, client->name_client, client->sockfd);
+            printf("%s\nClient %c connesso\nClient %c fd: %d\n", message_connection_log, client->name_client, client->sockfd);
             // write_log(message_connection_log, 0);
             pthread_create(&threads[i], NULL, client_thread, (void*)client);
             connected_host ++;
@@ -109,7 +108,6 @@ int main(int argc, char* argv[]) {
         initscr(); // Inizializza la finestra ncurses principale
         getmaxyx(stdscr, start_y, start_x); // Ottengo le dimensioni dello schermo
         create_window(&input_window, start_y-4, start_x, 0, 0);   // 51 x 202 parte da riga:0 e colonna: 0
-        // create_window(&output_window, start_y-4, start_x/2, 0, start_x/2);  // 51 x 101 parte da riga: 0 e colonna: 101
         create_window(&write_window, 4, start_x, start_y-4, 0);     // 4 x 101 parte da riga: 51 e colonna: 0
 
         

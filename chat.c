@@ -1,4 +1,3 @@
-
 /*
  * Autori: Ignazio Leonardo Calogero Sperandeo.
  * Data: 13/06/2024
@@ -82,6 +81,7 @@ void* send_message_to_host(void* arg) {     // funzione che invia qualcosa al se
     int sockfd = *((int*)arg);
     char buf[MAX_LENGTH_MSG];
     ssize_t bytes_written;
+    
     do {
         mvwprintw(write_window, 1, 1, "Me> ");      // chiedo all'utente cosa vuole mandare all'altro host su una terza finestra.
         mvwgetstr(write_window, 1, 4, buf);
@@ -102,7 +102,7 @@ void* send_message_to_host(void* arg) {     // funzione che invia qualcosa al se
 // FUNZIONE LATO SERVER
 void* client_thread(void* arg){
     Client_info* client = (Client_info*)arg;
-    printf("%c è entrato nel suo thread\n", client->name_client);
+    // printf("%c è entrato nel suo thread\n", client->name_client); debug :)
     do{
         size_t bytes_written = recv(client->sockfd, client->message, sizeof(client->message), 0);
         client->message[bytes_written] = '\0';
@@ -110,7 +110,6 @@ void* client_thread(void* arg){
             char temp_message[2000];
             snprintf(temp_message, sizeof(temp_message), "%c> %s", client->name_client, client->message);
             strncpy(client->message, temp_message, sizeof(client->message));
-            client->message[sizeof(client->message) - 1] = '\0';
 
             // printf("%c sta provando a mandare un messaggio\n", client->name_client); debug :)
             // printf("%c prova a mandare: %s\n", client->name_client, client->message); debug :)
@@ -138,7 +137,7 @@ void* send_to_all(void* arg){
     for(int i = 0; i < MAX_HOST; i++){
         pthread_mutex_lock(&mutex);
         if(fd_array[i] != 0 && fd_array[i] != client->sockfd){
-            write(fd_array[i], client->message, strlen(client->message)-1);
+            write(fd_array[i], client->message, strlen(client->message)+1);
             // printf("%c sta inviando..... %s fd: %d vs clientsock: %d\n", client->name_client, client->message, fd_array[i], client->sockfd); debug :)
         }
         pthread_mutex_unlock(&mutex);
