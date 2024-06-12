@@ -1,0 +1,8 @@
+# Ignore push.sh script
+./push.sh
+
+# Ignore log.txt file for client
+./log.txt
+
+# Ignore object file
+./chat
