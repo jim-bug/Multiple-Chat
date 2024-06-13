@@ -30,7 +30,7 @@ int start_x;
 int start_y;
 pthread_t receive_thread;
 pthread_t write_thread;
-int fd_array[MAX_HOST];
+Client_info* client_connected[MAX_HOST];
 int connected_host = 0;
 
 int main(int argc, char* argv[]) {
@@ -51,7 +51,6 @@ int main(int argc, char* argv[]) {
     else if (strcmp(argv[1], "-s") == 0) { // caso server
         int server_sock;
         pthread_t threads[MAX_HOST];
-        int i = 0;
         struct sockaddr_in server_addr, client_addr;
         socklen_t client_len = sizeof(client_addr);
         
@@ -83,23 +82,24 @@ int main(int argc, char* argv[]) {
 
         // Metto il mezzo socket del server in grado di accettare connessioni
         while (connected_host < MAX_HOST) {
-            fd_array[connected_host] = accept(server_sock, (struct sockaddr*)&client_addr, &client_len);
-            if (fd_array[connected_host] < 0) {
+            client_connected[connected_host] = (Client_info*)malloc(sizeof(Client_info));
+            client_connected[connected_host]->sockfd = accept(server_sock, (struct sockaddr*)&client_addr, &client_len);
+
+            if (client_connected[connected_host]->sockfd < 0) {
                 snprintf(message_connection_log, MAX_LENGTH_MSG, "Connessione non avvenuta da parte della destinazione: %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
                 write_log(message_connection_log, 1);
             }
-            Client_info* client = (Client_info*)malloc(sizeof(Client_info));
 
-            client->sockfd = fd_array[connected_host];
-            client->name_client = 'A' + connected_host;
-            snprintf(message_connection_log, MAX_LENGTH_MSG, "Connessione avvenuta da parte della destinazione: %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));      // funzioni usate per mandare a video porta e ip del client.
-            printf("%s\nClient %c connesso\nClient %c fd: %d\n", message_connection_log, client->name_client, client->sockfd);
-            // write_log(message_connection_log, 0);
-            pthread_create(&threads[i], NULL, client_thread, (void*)client);
+
+            client_connected[connected_host]->address = client_addr;
+            client_connected[connected_host]->name_client = 'A' + connected_host;
+            snprintf(message_connection_log, MAX_LENGTH_MSG, "Connessione avvenuta da parte della destinazione: %s:%d", inet_ntoa(client_connected[connected_host]->address.sin_addr), ntohs(client_connected[connected_host]->address.sin_port));      // funzioni usate per mandare a video porta e ip del client.
+            printf("%s\nClient %c connesso e ha fd: %d\n", message_connection_log, client_connected[connected_host]->name_client, client_connected[connected_host]->sockfd);
+            pthread_create(&client_connected[connected_host]->fd_sender, NULL, client_thread, (void*)client_connected[connected_host]);
             connected_host ++;
         }
         for(int i = 0; i < MAX_HOST; i++){
-            pthread_join(threads[i], NULL);
+            pthread_join(client_connected[i]->fd_sender, NULL);
         }
         close(server_sock);
     }
@@ -107,7 +107,8 @@ int main(int argc, char* argv[]) {
     else if (strcmp(argv[1], "-c") == 0 && atoi(argv[3]) >= 1024 && atoi(argv[3]) <= 49151) { // caso client, con controllo sul numero di porta scelto.
         initscr(); // Inizializza la finestra ncurses principale
         getmaxyx(stdscr, start_y, start_x); // Ottengo le dimensioni dello schermo
-        create_window(&input_window, start_y-4, start_x, 0, 0);   // 51 x 202 parte da riga:0 e colonna: 0
+        create_window(&input_window, start_y-4, start_x/2, 0, 0);   // 51 x 101 parte da riga:0 e colonna: 0
+        create_window(&output_window, start_y-4, start_x/2, 0, start_x/2);  // 51 x 101 parte da riga: 0 e colonna: 101
         create_window(&write_window, 4, start_x, start_y-4, 0);     // 4 x 101 parte da riga: 51 e colonna: 0
 
         

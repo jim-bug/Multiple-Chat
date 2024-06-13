@@ -22,18 +22,6 @@
 * Variabili dichiarate come extern perchè ho la necessità di utilizzarne in due sorgenti diversi, fungono da variabili globali per due sorgenti.
 * In uno dei due sorgenti dovranno essere dichiarate.
 */
-extern WINDOW* input_window;
-extern WINDOW* output_window;
-extern WINDOW* write_window;
-extern FILE* log_file;
-extern int start_y;
-extern int start_x;
-extern pthread_t receive_thread;
-extern pthread_t write_thread;
-extern int fd_array[MAX_HOST];
-extern int connected_host;
-
-
 
 typedef struct {
     int sockfd;
@@ -42,6 +30,19 @@ typedef struct {
     char name_client;
     pthread_t fd_sender;
 } Client_info;
+
+extern WINDOW* input_window;
+extern WINDOW* output_window;
+extern WINDOW* write_window;
+extern FILE* log_file;
+extern int start_y;
+extern int start_x;
+extern pthread_t receive_thread;
+extern pthread_t write_thread;
+extern Client_info* client_connected[MAX_HOST];
+extern int connected_host;
+
+
 
 void closing_sequence();        // sequenza di chiusura di finestre, file
 void print_stack_trace();       // funzione che manda a video un breve help su come usare la chat.

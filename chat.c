@@ -21,8 +21,10 @@
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_rows = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_ncurses = PTHREAD_MUTEX_INITIALIZER;
 int window_rows_sharing = 1;
 char flag_state_close = 'n';
+char flag_start_get_message = 'n';
 
 
 void closing_sequence(){
@@ -53,7 +55,7 @@ void write_log(char log_message[], int state_error){
 void create_window(WINDOW** new_win, int row, int col, int begin_y, int begin_x){
 	    *new_win = newwin(row, col, begin_y, begin_x);
         refresh();
-        box(*new_win, '|', '|');     // piccolo debug per le finestre
+        // box(*new_win, '|', '|');     // piccolo debug per le finestre
         wrefresh(*new_win);
 }
 
@@ -61,18 +63,23 @@ void create_window(WINDOW** new_win, int row, int col, int begin_y, int begin_x)
 void* get_message_from_host(void* arg) {        // funzione che riceve qualcosa dal server/client
     int sockfd = *((int*)arg);
     char buf[MAX_LENGTH_MSG]; // Buffer per i dati
-    ssize_t bytes_read;
+    ssize_t bytes_read = 1;
     do {
-        bytes_read = recv(sockfd, buf, sizeof(buf), 0);
-        buf[bytes_read] = '\0';
-        pthread_mutex_lock(&mutex_rows);
-            window_rows_sharing++;
-        pthread_mutex_unlock(&mutex_rows);
+        if(flag_start_get_message != 'n'){
+            bytes_read = recv(sockfd, buf, sizeof(buf), 0);
+            buf[bytes_read] = '\0';
+            
+            pthread_mutex_lock(&mutex_rows);
+                window_rows_sharing++;
+            pthread_mutex_unlock(&mutex_rows);
+            
 
-        mvwprintw(input_window, window_rows_sharing, 1, "%s", buf);
-        wrefresh(input_window);
+            mvwprintw(output_window, window_rows_sharing, 1, "%s", buf);
+            wrefresh(output_window);
+        }
 
     } while(bytes_read > 0);
+
     return NULL;
 }
 
@@ -80,19 +87,33 @@ void* get_message_from_host(void* arg) {        // funzione che riceve qualcosa 
 void* send_message_to_host(void* arg) {     // funzione che invia qualcosa al server/client
     int sockfd = *((int*)arg);
     char buf[MAX_LENGTH_MSG];
+    char name[MAX_LENGTH_MSG];
     ssize_t bytes_written;
-    
+    ssize_t bytes_read = recv(sockfd, name, sizeof(name), 0);
+    name[bytes_read] = '\0';
+    if(bytes_read > 0){
+        strcat(name, "> ");
+        flag_start_get_message = 'y';
+        // mvwprintw(write_window, 1, 1, "NOME ASSEGNATO MA FA BENE");
+    }
+    else{
+        // mvwprintw(write_window, 5, 1, "NOME NON ASSEGNATO SCHIFO");
+        flag_state_close = 'y';
+        // closing_sequence();
+        // exit(EXIT_FAILURE);
+    }
     do {
-        mvwprintw(write_window, 1, 1, "Me> ");      // chiedo all'utente cosa vuole mandare all'altro host su una terza finestra.
+        mvwprintw(write_window, 1, 1, name);      // chiedo all'utente cosa vuole mandare all'altro host su una terza finestra.
         mvwgetstr(write_window, 1, 4, buf);
-        mvwprintw(input_window, window_rows_sharing, 1, "Me> %s", buf);       // mando a video sulla finestra di input ciò che ho inviato
+        mvwprintw(input_window, window_rows_sharing, 1, "%s %s", name, buf);       // mando a video sulla finestra di input ciò che ho inviato 
         pthread_mutex_lock(&mutex_rows);
             window_rows_sharing++;
         pthread_mutex_unlock(&mutex_rows);
-        wclear(write_window);
+
         bytes_written = write(sockfd, buf, strlen(buf)+1);
         wrefresh(input_window);
         wrefresh(write_window);
+        wclear(write_window);
 
     } while(strcmp(buf, "/exit") != 0 || bytes_written <= 0);
     flag_state_close = 'y';
@@ -102,6 +123,8 @@ void* send_message_to_host(void* arg) {     // funzione che invia qualcosa al se
 // FUNZIONE LATO SERVER
 void* client_thread(void* arg){
     Client_info* client = (Client_info*)arg;
+    char str[2] = {client->name_client, '\0'};
+    write(client->sockfd, str, strlen(str)+1);
     // printf("%c è entrato nel suo thread\n", client->name_client); debug :)
     do{
         size_t bytes_written = recv(client->sockfd, client->message, sizeof(client->message), 0);
@@ -114,7 +137,7 @@ void* client_thread(void* arg){
             // printf("%c sta provando a mandare un messaggio\n", client->name_client); debug :)
             // printf("%c prova a mandare: %s\n", client->name_client, client->message); debug :)
             pthread_create(&client->fd_sender, NULL, send_to_all, (void*)arg);
-            // pthread_detach(client->fd_sender);
+            pthread_detach(client->fd_sender);
         }
     } while(strcmp(client->message, "/exit") != 0);
 
@@ -136,8 +159,12 @@ void* send_to_all(void* arg){
     Client_info* client = (Client_info*)arg;
     for(int i = 0; i < MAX_HOST; i++){
         pthread_mutex_lock(&mutex);
-        if(fd_array[i] != 0 && fd_array[i] != client->sockfd){
-            write(fd_array[i], client->message, strlen(client->message)+1);
+        if(client_connected[i] == NULL){
+            pthread_mutex_unlock(&mutex);
+            continue;
+        }
+        if(client_connected[i]->sockfd != 0 && client_connected[i]->sockfd != client->sockfd){
+            write(client_connected[i]->sockfd, client->message, strlen(client->message)+1);
             // printf("%c sta inviando..... %s fd: %d vs clientsock: %d\n", client->name_client, client->message, fd_array[i], client->sockfd); debug :)
         }
         pthread_mutex_unlock(&mutex);
@@ -148,8 +175,8 @@ void* send_to_all(void* arg){
 // FUNZIONE LATO SERVER
 void remove_fd(int fd){
     for(int i = 0; i < MAX_HOST; i++){
-        if(fd_array[i] == fd){
-            fd_array[i] = 0;
+        if(client_connected[i]->sockfd == fd){
+            client_connected[i] = NULL;
         }
     }
 }
@@ -165,5 +192,5 @@ void* listen_threads(void* arg){
     pthread_cancel(receive_thread);
     pthread_cancel(write_thread);
     closing_sequence();
-    // exit(EXIT_SUCCESS);
+    exit(EXIT_SUCCESS);
 }
