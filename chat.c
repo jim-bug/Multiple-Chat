@@ -55,17 +55,17 @@ void write_log(char log_message[], int state_error){
 void create_window(WINDOW** new_win, int row, int col, int begin_y, int begin_x){
 	    *new_win = newwin(row, col, begin_y, begin_x);
         refresh();
-        // box(*new_win, '|', '|');     // piccolo debug per le finestre
+        // box(*new_win, '|', '|');     // piccolo debug per le finestre :)
         wrefresh(*new_win);
 }
 
 // FUNZIONE LATO CLIENT
 void* get_message_from_host(void* arg) {        // funzione che riceve qualcosa dal server/client
     int sockfd = *((int*)arg);
-    char buf[MAX_LENGTH_MSG]; // Buffer per i dati
+    char buf[MAX_LENGTH_MSG]; 
     ssize_t bytes_read = 1;
     do {
-        if(flag_start_get_message != 'n'){
+        if(flag_start_get_message != 'n'){      // se il server ha assegnato un nome al client allora posso iniziare a ricevere messaggi.
             bytes_read = recv(sockfd, buf, sizeof(buf), 0);
             buf[bytes_read] = '\0';
             
@@ -93,14 +93,12 @@ void* send_message_to_host(void* arg) {     // funzione che invia qualcosa al se
     name[bytes_read] = '\0';
     if(bytes_read > 0){
         strcat(name, "> ");
-        flag_start_get_message = 'y';
-        // mvwprintw(write_window, 1, 1, "NOME ASSEGNATO MA FA BENE");
+        flag_start_get_message = 'y';   // appena ottengo il nome dal server permetto al thread di ricezione di iniziare a ricevere messaggi.
+        // mvwprintw(write_window, 1, 1, "NOME ASSEGNATO MA FA BENE");  debug :)
     }
     else{
-        // mvwprintw(write_window, 5, 1, "NOME NON ASSEGNATO SCHIFO");
+        // mvwprintw(write_window, 5, 1, "NOME NON ASSEGNATO SCHIFO");   debug :)
         flag_state_close = 'y';
-        // closing_sequence();
-        // exit(EXIT_FAILURE);
     }
     do {
         mvwprintw(write_window, 1, 1, name);      // chiedo all'utente cosa vuole mandare all'altro host su una terza finestra.
