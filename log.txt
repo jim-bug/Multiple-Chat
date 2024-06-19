@@ -1,2 +1,3 @@
+Scelta nome corretta -> OK
 Creazione del mezzo socket del client -> OK
 Connessione avvenuta alla destinazione -> 127.0.0.1:4870

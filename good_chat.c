@@ -1,14 +1,12 @@
 /*
- * Autori: Ignazio Leonardo Calogero Sperandeo.
+* Author: Ignazio Leonardo Calogero Sperandeo.
  * Data: 13/06/2024
- * Consegna: Realizzare una chat in C che presenti una CLI. La chat deve permettere il dialogo tra due terminali nella stessa LAN e in LAN diverse.
- * Link al repo: https://github.com/jim-bug/Multiple-Chat
- * Riferimenti alla parte dell'ingegnieria del software: 
- * Nome progetto: Multiple-Chat
+ * Repo: https://github.com/jim-bug/Multiple-Chat
+ * Project Name: Multiple-Chat
+ * by jim_bug :)
 */
 
 
-#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,8 +17,8 @@
 #include <netdb.h>
 #include <ncurses.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #include "chat.h"
-
 
 WINDOW* input_window;
 WINDOW* output_window;
@@ -30,118 +28,119 @@ int start_x;
 int start_y;
 pthread_t receive_thread;
 pthread_t write_thread;
-Client_info* client_connected[MAX_HOST];
-int connected_host = 0;
+// ConnectedClientInfo* client_connected[MAX_HOST]; approccio con array
+struct Node* head_connected_client = NULL;
+int connected_client = -1;
 
 int main(int argc, char* argv[]) {
     pthread_t listener;
     char message_connection_log[MAX_LENGTH_MSG];
     log_file = fopen("log.txt", "w");
 
-
-
     if (argc < 2) {
-        // se non inserisco alcuna opzione.
-        print_stack_trace();
+        help();
     }
-    else if(strcmp(argv[1], "-s") != 0 && strcmp(argv[1], "-c") != 0){
-        // se non inserisco un opzione prevista.
-        print_stack_trace();
+    else if(strcmp(argv[1], "-s") != 0 && strcmp(argv[1], "-c") != 0){     // The only valid options are: -s -c
+        help();
     }
-    else if (strcmp(argv[1], "-s") == 0) { // caso server
+    else if (strcmp(argv[1], "-s") == 0) {                                 // server's side
         int server_sock;
         pthread_t threads[MAX_HOST];
         struct sockaddr_in server_addr, client_addr;
         socklen_t client_len = sizeof(client_addr);
-        
 
-        // Creazione del socket del server
         server_sock = socket(AF_INET, SOCK_STREAM, 0);
         if (server_sock < 0) {
-            write_log("Creazione mezzo socket del server -> ERRORE", 1);
+            write_log("Creating server's side socket -> ERROR", 1);
         }
-        write_log("Creazione mezzo socket del server -> OK", 0);
+        write_log("Creating server's side socket -> ERROR", 0);
 
-
+        // Initializing the server struct
         memset(&server_addr, 0, sizeof(server_addr));
         server_addr.sin_family = AF_INET;
         server_addr.sin_addr.s_addr = INADDR_ANY;
         server_addr.sin_port = htons(SERVER_PORT);
 
-        // Binding del mezzo socket del server all'indirizzo locale
         if (bind(server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-            write_log("Binding del mezzo socket del server -> ERRORE", 1);
+            write_log("Binding of server's side socket -> ERROR", 1);
         }
-        write_log("Binding del mezzo socket del server -> OK", 0);
-        
-        // Metto il mezzo socket del server in ascolto di connessioni, con una coda massima di 1 persona.
+        write_log("Binding of server's side socket -> OK", 0);
+
         if (listen(server_sock, 1) < 0) {
-            write_log("Listen del mezzo socket del server -> ERRORE", 1);
+            write_log("Listen of server's side socket -> ERROR", 1);
         }
-        write_log("Listen del mezzo socket del server -> OK", 0);
+        write_log("Listen of server's side socket -> OK", 0);
 
-        // Metto il mezzo socket del server in grado di accettare connessioni
-        while (connected_host < MAX_HOST) {
-            client_connected[connected_host] = (Client_info*)malloc(sizeof(Client_info));
-            client_connected[connected_host]->sockfd = accept(server_sock, (struct sockaddr*)&client_addr, &client_len);
+        while (1) {
+            ConnectedClientInfo* temp_client = (ConnectedClientInfo*)malloc(sizeof(ConnectedClientInfo));
+            temp_client->sockfd = accept(server_sock, (struct sockaddr*)&client_addr, &client_len);
 
-            if (client_connected[connected_host]->sockfd < 0) {
-                snprintf(message_connection_log, MAX_LENGTH_MSG, "Connessione non avvenuta da parte della destinazione: %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+            if (temp_client->sockfd < 0) {
+                snprintf(message_connection_log, MAX_LENGTH_MSG, "The connection doesn't happen from: %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
                 write_log(message_connection_log, 1);
             }
+            snprintf(message_connection_log, MAX_LENGTH_MSG, "The connection happens from: %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+            write_log(message_connection_log, 0);
 
+            temp_client->address = client_addr;
+            pthread_create(&temp_client->fd_sender, NULL, client_thread, (void*)temp_client);
 
-            client_connected[connected_host]->address = client_addr;
-            client_connected[connected_host]->name_client = 'A' + connected_host;
-            snprintf(message_connection_log, MAX_LENGTH_MSG, "Connessione avvenuta da parte della destinazione: %s:%d", inet_ntoa(client_connected[connected_host]->address.sin_addr), ntohs(client_connected[connected_host]->address.sin_port));      // funzioni usate per mandare a video porta e ip del client.
-            printf("%s\nClient %c connesso e ha fd: %d\n", message_connection_log, client_connected[connected_host]->name_client, client_connected[connected_host]->sockfd);
-            pthread_create(&client_connected[connected_host]->fd_sender, NULL, client_thread, (void*)client_connected[connected_host]);
-            connected_host ++;
+            pthread_mutex_lock(&mutex);
+                insert(&head_connected_client, temp_client);
+            pthread_mutex_unlock(&mutex);
         }
-        for(int i = 0; i < MAX_HOST; i++){
-            pthread_join(client_connected[i]->fd_sender, NULL);
+        /*
+        while(head_connected_client != NULL){
+            pthread_join(head_connected_client->client->fd_sender, NULL);
+            head_connected_client = head_connected_client->next;
         }
         close(server_sock);
+        */
     }
 
-    else if (strcmp(argv[1], "-c") == 0 && atoi(argv[3]) >= 1024 && atoi(argv[3]) <= 49151) { // caso client, con controllo sul numero di porta scelto.
-        initscr(); // Inizializza la finestra ncurses principale
-        getmaxyx(stdscr, start_y, start_x); // Ottengo le dimensioni dello schermo
-        create_window(&input_window, start_y-4, start_x/2, 0, 0);   // 51 x 101 parte da riga:0 e colonna: 0
-        create_window(&output_window, start_y-4, start_x/2, 0, start_x/2);  // 51 x 101 parte da riga: 0 e colonna: 101
-        create_window(&write_window, 4, start_x, start_y-4, 0);     // 4 x 101 parte da riga: 51 e colonna: 0
-
-        
+    else if (strcmp(argv[1], "-c") == 0 && atoi(argv[3]) >= 1024 && atoi(argv[3]) <= 49151) {         // client's side
         int client_sock;
         unsigned short port = (unsigned short) atoi(argv[3]);
+        char name_client[100];
         struct sockaddr_in server_addr;
         struct hostent* hp;
-        
+        ConnectedClientInfo* client = (ConnectedClientInfo*)malloc(sizeof(ClientInfo));
+        initscr();                                                         // creating the main ncurses window
+        getmaxyx(stdscr, start_y, start_x);
+        create_window(&input_window, start_y-4, start_x/2, 0, 0);           // The input window(51 x 101) start to row: 0 and column: 0
+        create_window(&output_window, start_y-4, start_x/2, 0, start_x/2);  // The output window(51 x 101) start to row: 0 and column: 101
+        create_window(&write_window, 4, start_x, start_y-4, 0);             // The write window(4 x 101) start to row: 51 and column: 0
 
-        // Creazione del socket del client
+        if(strlen(argv[4]) > 100){
+            write_log("Choosen name -> ERROR, check the size(0 < size < 100)", 1);
+        }
+        write_log("Choosen name -> OK", 0);
+        strncpy(client->name, argv[4], sizeof(client->name));
+
+
         client_sock = socket(AF_INET, SOCK_STREAM, 0);
         if (client_sock < 0) {
-            write_log("Creazione del mezzo socket del client -> ERRORE", 1);
+            write_log("Creating client socket -> ERROR", 1);
         }
-        write_log("Creazione del mezzo socket del client -> OK", 0);
-        
+        write_log("Creating client socket -> OK", 0);
+        client->sockfd = client_sock;
         memset(&server_addr, 0, sizeof(server_addr));
         server_addr.sin_family = AF_INET;
 
-        server_addr.sin_port = htons(port);        // converto in intero la stringa che indica il numero di porta
-        inet_pton(AF_INET, argv[2], &server_addr.sin_addr);	// assegno l'ip del server alla quale il client si dovrà connettere.
+        server_addr.sin_port = htons(port);
+        inet_pton(AF_INET, argv[2], &server_addr.sin_addr);
 
 
         if (connect(client_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-            snprintf(message_connection_log, MAX_LENGTH_MSG, "Connessione non avvenuta alla destinazione -> %s:%s", argv[2], argv[3]);
+            snprintf(message_connection_log, MAX_LENGTH_MSG, "The connection doesn't happen to: %s:%s", argv[2], argv[3]);
             write_log(message_connection_log, 1);
         }
-        snprintf(message_connection_log, MAX_LENGTH_MSG, "Connessione avvenuta alla destinazione -> %s:%s", argv[2], argv[3]);
+        snprintf(message_connection_log, MAX_LENGTH_MSG, "The connection happens to: %s:%s", argv[2], argv[3]);
         write_log(message_connection_log, 0);
 
-        // Creazione dei thread per la ricezione e l'invio dei messaggi
-        pthread_create(&receive_thread, NULL, get_message_from_host, &client_sock);
-        pthread_create(&write_thread, NULL, send_message_to_host, &client_sock);
+
+        pthread_create(&receive_thread, NULL, get_message_from_host, (void*)client);
+        pthread_create(&write_thread, NULL, send_message_to_host, (void*)client);
         pthread_create(&listener, NULL, listen_threads, NULL);
         pthread_join(receive_thread, NULL);
         pthread_join(write_thread, NULL);
@@ -149,7 +148,7 @@ int main(int argc, char* argv[]) {
         close(client_sock);
     }
     else{
-        print_stack_trace();
+        help();
     }
     
     return 0;
