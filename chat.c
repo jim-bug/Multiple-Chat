@@ -108,7 +108,7 @@ void* client_thread(void* arg){
         bytes_written = recv(client->sockfd, client->name, sizeof(client->name), 0);
         client->name[bytes_written] = '\0';
     }
-    printf("The connection happens from: %s:%d ----- %s connected with server\n", inet_ntoa(client->address.sin_addr), ntohs(client->address.sin_port), client->name);
+    printf("The connection happens from: %s:%d -- %s connected with server\n", inet_ntoa(client->address.sin_addr), ntohs(client->address.sin_port), client->name);
     snprintf(client->closing_message, sizeof(client->closing_message), "%s> /exit", client->name);
     // printf("Assegned Name: %s\n", client->name); // debug :)
     // printf("%s  entrato nel suo thread\n", client->name); // debug :)
@@ -130,7 +130,7 @@ void* client_thread(void* arg){
         delete_node(&head_connected_client, client->sockfd);
         close(client->sockfd);
     pthread_mutex_unlock(&mutex);
-    printf("The Client closed connection from: %s:%d ----- %s came out of the chat\n", inet_ntoa(client->address.sin_addr), ntohs(client->address.sin_port), client->name);
+    printf("The Client closed connection from: %s:%d -- %s came out of the chat\n", inet_ntoa(client->address.sin_addr), ntohs(client->address.sin_port), client->name);
 
     return NULL;
 }
