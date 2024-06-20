@@ -55,17 +55,52 @@ void* get_message_from_host(void* arg) {
     char buf[MAX_LENGTH_MSG]; 
     ssize_t bytes_read = 1;
     do {
-            bytes_read = recv(client->sockfd, buf, sizeof(buf), 0);
-            buf[bytes_read] = '\0';
-            
-            pthread_mutex_lock(&mutex_rows);
-                window_rows_sharing++;
-            pthread_mutex_unlock(&mutex_rows);
-            
+        bytes_read = recv(client->sockfd, buf, sizeof(buf), 0);
+        buf[bytes_read] = '\0';
 
-            mvwprintw(output_window, window_rows_sharing, 1, "%s", buf);
-            wrefresh(output_window);
+		if(window_rows_sharing >= (start_y-4)){
+        	wclear(output_window);
+			wclear(input_window);
+			wrefresh(output_window);
+			wrefresh(input_window);
+			pthread_mutex_lock(&mutex_rows);
+				window_rows_sharing = 1;
+			pthread_mutex_unlock(&mutex_rows);
+		}
+		else if(strlen(buf) > (start_x/2)){
+			int len = strlen(buf);
+			char new_buf[(start_x/2)+2];
+			int start = strlen(client->name)+5;
+			int end = start_x/2;
 
+			while(len > (start_x/2)){
+			    pthread_mutex_lock(&mutex_rows);
+					window_rows_sharing ++;
+			    pthread_mutex_unlock(&mutex_rows);
+				memcpy(new_buf, buf+start, end);
+				new_buf[start_x/2] = '\0';
+				mvwprintw(output_window, window_rows_sharing, 1, "%s> %s", client->name, new_buf);
+				len -= strlen(new_buf);
+				start = end;
+				end += (start_x/2);
+			}
+			if(len > 0){
+					pthread_mutex_lock(&mutex_rows);
+					    window_rows_sharing ++;
+			        pthread_mutex_unlock(&mutex_rows);
+
+					memcpy(new_buf, buf+start, len+start);
+					mvwprintw(output_window, window_rows_sharing, 1, "%s> %s", client->name, new_buf);
+			}
+		}
+		else{
+				pthread_mutex_lock(&mutex_rows);
+					window_rows_sharing ++;
+			    pthread_mutex_unlock(&mutex_rows);
+                mvwprintw(output_window, window_rows_sharing, 1, "%s", buf);
+		}
+
+        wrefresh(output_window);
     } while(bytes_read > 0);
 
     return NULL;
@@ -80,18 +115,60 @@ void* send_message_to_host(void* arg) {
     do {
         mvwprintw(write_window, 1, 1, "%s> ", client->name);
         mvwgetstr(write_window, 1, strlen(client->name)+2, client->message);
-        mvwprintw(input_window, window_rows_sharing, 1, "%s> %s", client->name, client->message);
 
-        pthread_mutex_lock(&mutex_rows);
-            window_rows_sharing++;
-        pthread_mutex_unlock(&mutex_rows);
+        if(strcmp(client->message, "/cls") == 0){
+                wclear(output_window);
+				wclear(input_window);
+                wrefresh(output_window);
+				wrefresh(input_window);
+        }
+		else if(window_rows_sharing >= (start_y-4)){
+        	wclear(output_window);
+			wclear(input_window);
+			wrefresh(output_window);
+			wrefresh(input_window);
+			pthread_mutex_lock(&mutex_rows);
+				window_rows_sharing = 1;
+			pthread_mutex_unlock(&mutex_rows);
+		}
+		else if(strlen(client->message) > (start_x/2)){            // see TOO_SIZE_PROBLEM.txt to review the problem and the solution.
+			int len = strlen(client->message);
+			char new_buf[(start_x/2)+2];
+			int start = 0;
+			int end = start_x/2;
+
+			while(len > (start_x/2)){
+			pthread_mutex_lock(&mutex_rows);
+					window_rows_sharing ++;
+			pthread_mutex_unlock(&mutex_rows);
+			memcpy(new_buf, client->message+start, end);
+			new_buf[start_x/2] = '\0';
+			mvwprintw(input_window, window_rows_sharing, 1, "%s> %s", client->name, new_buf);
+			len -= strlen(new_buf);
+			start = end;
+			end += (start_x/2);
+			}
+			if(len > 0){
+					pthread_mutex_lock(&mutex_rows);
+					    window_rows_sharing ++;
+			        pthread_mutex_unlock(&mutex_rows);
+					memcpy(new_buf, client->message+start, len+start);
+					mvwprintw(input_window, window_rows_sharing, 1, "%s> %s", client->name, new_buf);
+			}
+		}
+		else{
+				pthread_mutex_lock(&mutex_rows);
+					window_rows_sharing ++;
+				pthread_mutex_unlock(&mutex_rows);
+				mvwprintw(input_window, window_rows_sharing, 1, "%s> %s", client->name, client->message);
+		}
 
         bytes_written = write(client->sockfd, client->message, strlen(client->message)+1);
         wrefresh(input_window);
         wrefresh(write_window);
         wclear(write_window);
 
-    } while(strcmp(client->message, "/exit") != 0 || bytes_written <= 0);
+    } while(strcmp(client->message, "/exit") != 0);
     flag_state_close = 'y';
     return NULL;
 }

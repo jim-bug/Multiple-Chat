@@ -19,6 +19,7 @@
 #include <ncurses.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <math.h>
 
 #define MAX_LENGTH_MSG 1024
 #define MAX_NAME_LENGTH 100
@@ -74,6 +75,7 @@ void create_window(WINDOW**, int, int, int, int);   // it creates a ncurses wind
 void* get_message_from_host(void*);                 // client's side function, it gets messages from his fd.
 void* send_message_to_host(void*);                  // client's side function, it sends messages from his fd.
 void* listen_threads(void*);                        // client's side function, it waits a closing signal from client messages
+void check_special_key(void*);
 void* client_thread(void*);                         // server's side function, it receives messages from the client and sends them to other connected clients, similar to the flooding protocol.
 void* send_to_all(void*);                           // server's side function
 

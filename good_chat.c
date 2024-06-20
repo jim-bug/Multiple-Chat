@@ -45,6 +45,7 @@ int main(int argc, char* argv[]) {
     }
     else if (strcmp(argv[1], "-s") == 0) {                                 // server's side
         int server_sock;
+        char close_option = 'x';
         pthread_t threads[MAX_HOST];
         struct sockaddr_in server_addr, client_addr;
         socklen_t client_len = sizeof(client_addr);
