@@ -12,20 +12,12 @@
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_rows = PTHREAD_MUTEX_INITIALIZER;
 int window_rows_sharing = 1;
-char flag_state_close = 'n';
 
-void closing_sequence(char side){
-		if(side == 'c'){
-			delwin(input_window);
-			delwin(output_window);
-			delwin(write_window);
-		}
-		else if(side == 's'){
-			while(head_connected_client != NULL){
-				pthread_join(head_connected_client->client->fd_sender, NULL);
-				head_connected_client = head_connected_client->next;
-			}
-		}
+
+void closing_sequence(){
+		delwin(input_window);
+		delwin(output_window);
+		delwin(write_window);
         endwin();
         fclose(log_file);
 }
@@ -38,10 +30,10 @@ void help(){
 
 
 // CLIENT'S SIDE
-void write_log(char log_message[], int state_error, char side){
+void write_log(char log_message[], int state_error){
         if(state_error == 1){       // caso di errore.
             fprintf(log_file, "%s\n", log_message);
-            closing_sequence(side);
+            closing_sequence();
             exit(EXIT_FAILURE);
         }
         fprintf(log_file, "%s\n", log_message);
@@ -64,6 +56,7 @@ void* get_message_from_host(void* arg) {
     do {
         bytes_read = recv(client->sockfd, buf, sizeof(buf), 0);
         buf[bytes_read] = '\0';
+    	mvwprintw(output_window, window_rows_sharing, 1, "%s", buf);
 
 		if(window_rows_sharing >= (start_y-4)){
         	wclear(output_window);
@@ -74,46 +67,15 @@ void* get_message_from_host(void* arg) {
 				window_rows_sharing = 1;
 			pthread_mutex_unlock(&mutex_rows);
 		}
-		else if(strlen(buf) > (start_x/2)){
-			int len = strlen(buf);
-			char new_buf[(start_x/2)+2];
-			char sender_name[start_x/2];
-			int start;
-			for(int i = 0;i < strlen(buf); i++){
-				if(buf[i] == '>'){
-					start = i+1;
-					memcpy(sender_name, buf, i-1);
-					sender_name[start_x/2] = '\0';
-					break;
-				}
-			}
-			int end = start_x/2;
-
-			while(len > (start_x/2)){
-			    pthread_mutex_lock(&mutex_rows);
-					window_rows_sharing ++;
-			    pthread_mutex_unlock(&mutex_rows);
-				memcpy(new_buf, buf+start, start_x);
-				new_buf[start_x/2] = '\0';
-				mvwprintw(output_window, window_rows_sharing, 1, "%s> %s", sender_name, new_buf);
-				len -= strlen(new_buf);
-				start = end;
-				end += (start_x/2);
-			}
-			if(len > 0){
-					pthread_mutex_lock(&mutex_rows);
-					    window_rows_sharing ++;
-			        pthread_mutex_unlock(&mutex_rows);
-
-					memcpy(new_buf, buf+start, len);
-					mvwprintw(output_window, window_rows_sharing, 1, "%s> %s", sender_name, new_buf);
-			}
+		else if(strlen(buf) > (start_x/2)){			// see TOO_SIZE_PROBLEM.txt to review the problem and the solution.
+			pthread_mutex_lock(&mutex_rows);
+				window_rows_sharing += floor((double)strlen(buf)/(start_x/2))+1;
+			pthread_mutex_unlock(&mutex_rows);
 		}
 		else{
-				pthread_mutex_lock(&mutex_rows);
-					window_rows_sharing ++;
-			    pthread_mutex_unlock(&mutex_rows);
-                mvwprintw(output_window, window_rows_sharing, 1, "%s", buf);
+			pthread_mutex_lock(&mutex_rows);
+				window_rows_sharing ++;
+		    pthread_mutex_unlock(&mutex_rows);
 		}
 
         wrefresh(output_window);
@@ -131,8 +93,10 @@ void* send_message_to_host(void* arg) {
     do {
         mvwprintw(write_window, 1, 1, "%s> ", client->name);
         mvwgetstr(write_window, 1, strlen(client->name)+2, client->message);
+    	bytes_written = write(client->sockfd, client->message, strlen(client->message)+1);
+    	mvwprintw(input_window, window_rows_sharing, 1, "%s> %s", client->name, client->message);
 
-        if(strcmp(client->message, "/cls") == 0){
+        if(strcmp(client->message, "/cls") == 0){		// clear command
                 wclear(output_window);
 				wclear(input_window);
                 wrefresh(output_window);
@@ -143,49 +107,29 @@ void* send_message_to_host(void* arg) {
 			wclear(input_window);
 			wrefresh(output_window);
 			wrefresh(input_window);
+
 			pthread_mutex_lock(&mutex_rows);
 				window_rows_sharing = 1;
 			pthread_mutex_unlock(&mutex_rows);
 		}
 		else if(strlen(client->message) > (start_x/2)){            // see TOO_SIZE_PROBLEM.txt to review the problem and the solution.
-			int len = strlen(client->message);
-			char new_buf[(start_x/2)+2];
-			int start = 0;
-			int end = start_x/2;
-
-			while(len > (start_x/2)){
 			pthread_mutex_lock(&mutex_rows);
-					window_rows_sharing ++;
+				window_rows_sharing += floor((double)strlen(client->message)/(start_x/2))+1;
 			pthread_mutex_unlock(&mutex_rows);
-			memcpy(new_buf, client->message+start, end);
-			new_buf[start_x/2] = '\0';
-			mvwprintw(input_window, window_rows_sharing, 1, "%s> %s", client->name, new_buf);
-			len -= strlen(new_buf);
-			start = end;
-			end += (start_x/2);
-			}
-			if(len > 0){
-					pthread_mutex_lock(&mutex_rows);
-					    window_rows_sharing ++;
-			        pthread_mutex_unlock(&mutex_rows);
-					memcpy(new_buf, client->message+start, len+start);
-					mvwprintw(input_window, window_rows_sharing, 1, "%s> %s", client->name, new_buf);
-			}
 		}
 		else{
-				pthread_mutex_lock(&mutex_rows);
-					window_rows_sharing ++;
-				pthread_mutex_unlock(&mutex_rows);
-				mvwprintw(input_window, window_rows_sharing, 1, "%s> %s", client->name, client->message);
+			pthread_mutex_lock(&mutex_rows);
+				window_rows_sharing ++;
+			pthread_mutex_unlock(&mutex_rows);
 		}
 
-        bytes_written = write(client->sockfd, client->message, strlen(client->message)+1);
         wrefresh(input_window);
         wrefresh(write_window);
         wclear(write_window);
 
     } while(strcmp(client->message, "/exit") != 0);
-    flag_state_close = 'y';
+	closing_sequence();
+    exit(EXIT_SUCCESS);
     return NULL;
 }
 
@@ -195,31 +139,21 @@ void* client_thread(void* arg){
     ConnectedClientInfo* client = (ConnectedClientInfo*)arg;
     pthread_t sender_thread;
     size_t bytes_written;
-    /*
-    strncpy(client->name, "NaName", sizeof(client->name));        // Not a Name
-    while(strcmp(client->name, "NaName") == 0){
-        bytes_written = recv(client->sockfd, client->name, sizeof(client->name), 0);
-        client->name[bytes_written] = '\0';
-        i ++;
-    }
-    */
-	bytes_written = recv(client->sockfd, client->name, sizeof(client->name), 0);
+	bytes_written = recv(client->sockfd, client->name, sizeof(client->name), 0);		// I get the client name
 	client->name[bytes_written] = '\0';
     printf("The connection happens from: %s:%d -- %s connected with server\n", inet_ntoa(client->address.sin_addr), ntohs(client->address.sin_port), client->name);
-    snprintf(client->closing_message, sizeof(client->closing_message), "%s> /exit", client->name);
     // printf("Assegned Name: %s\n", client->name); // debug :)
-    // printf("%s  entrato nel suo thread\n", client->name); // debug :)
+
     do{
         bytes_written = recv(client->sockfd, client->message, sizeof(client->message), 0);
         client->message[bytes_written] = '\0';
         if(bytes_written > 0){
-            char temp_message[2000];
+            char temp_message[MAX_LENGTH_MSG*2];
             snprintf(temp_message, sizeof(temp_message), "%s> %s", client->name, client->message);
             strncpy(client->message, temp_message, sizeof(client->message));
-
             pthread_create(&sender_thread, NULL, send_to_all, arg);
         }
-    } while(strcmp(client->message, client->closing_message) != 0);
+    } while(strcmp(client->message, "/exit") != 0);
 
 
     pthread_join(sender_thread, NULL);
@@ -228,7 +162,6 @@ void* client_thread(void* arg){
         close(client->sockfd);
     pthread_mutex_unlock(&mutex);
     printf("The Client closed connection from: %s:%d -- %s came out of the chat\n", inet_ntoa(client->address.sin_addr), ntohs(client->address.sin_port), client->name);
-
     return NULL;
 }
 
@@ -246,20 +179,6 @@ void* send_to_all(void* arg) {
         pthread_mutex_unlock(&mutex);
     }
     return NULL;
-}
-
-
-/*
-CLIENT'S SIDE
-The function waits until the value of the variable becomes 'y', which means the client wants to terminate the connection with the server.
-Then the function kills all client threads and starts the termination sequence.
-*/
-void* listen_threads(void* arg){
-    while(flag_state_close != 'y');
-    pthread_cancel(receive_thread);
-    pthread_cancel(write_thread);
-    closing_sequence('c');
-    exit(EXIT_SUCCESS);
 }
 
 
@@ -311,3 +230,5 @@ void print_list(struct Node* head){
         head = head->next;
     }
 }
+
+// :)
