@@ -68,9 +68,9 @@ extern pthread_mutex_t mutex_connected_client;
 extern pthread_mutex_t mutex;
 extern int connected_client;
 
-void closing_sequence();                            // it closes ncurses window, file.
+void closing_sequence(char);                            // it closes ncurses window, file.
 void help();                                        // it prints the man of Multiple-Chat.
-void write_log(char[], int);                        // it prints logs in a log file
+void write_log(char[], int, char);                        // it prints logs in a log file
 void create_window(WINDOW**, int, int, int, int);   // it creates a ncurses window
 void* get_message_from_host(void*);                 // client's side function, it gets messages from his fd.
 void* send_message_to_host(void*);                  // client's side function, it sends messages from his fd.

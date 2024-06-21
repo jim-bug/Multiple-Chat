@@ -52,9 +52,9 @@ int main(int argc, char* argv[]) {
 
         server_sock = socket(AF_INET, SOCK_STREAM, 0);
         if (server_sock < 0) {
-            write_log("Creating server's side socket -> ERROR", 1);
+            write_log("Creating server's side socket -> ERROR", 1, argv[1][0]);
         }
-        write_log("Creating server's side socket -> ERROR", 0);
+        write_log("Creating server's side socket -> ERROR", 0, argv[1][0]);
 
         // Initializing the server struct
         memset(&server_addr, 0, sizeof(server_addr));
@@ -63,25 +63,24 @@ int main(int argc, char* argv[]) {
         server_addr.sin_port = htons(SERVER_PORT);
 
         if (bind(server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-            write_log("Binding of server's side socket -> ERROR", 1);
+            write_log("Binding of server's side socket -> ERROR", 1, argv[1][0]);
         }
-        write_log("Binding of server's side socket -> OK", 0);
+        write_log("Binding of server's side socket -> OK", 0, argv[1][0]);
 
         if (listen(server_sock, 1) < 0) {
-            write_log("Listen of server's side socket -> ERROR", 1);
+            write_log("Listen of server's side socket -> ERROR", 1, argv[1][0]);
         }
-        write_log("Listen of server's side socket -> OK", 0);
-
-        while (1) {
+        write_log("Listen of server's side socket -> OK", 0, argv[1][0]);
+        while (1){
             ConnectedClientInfo* temp_client = (ConnectedClientInfo*)malloc(sizeof(ConnectedClientInfo));
             temp_client->sockfd = accept(server_sock, (struct sockaddr*)&client_addr, &client_len);
 
             if (temp_client->sockfd < 0) {
                 snprintf(message_connection_log, MAX_LENGTH_MSG, "The connection doesn't happen from: %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-                write_log(message_connection_log, 1);
+                write_log(message_connection_log, 1, argv[1][0]);
             }
             snprintf(message_connection_log, MAX_LENGTH_MSG, "The connection happens from: %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-            write_log(message_connection_log, 0);
+            write_log(message_connection_log, 0, argv[1][0]);
 
             temp_client->address = client_addr;
             pthread_create(&temp_client->fd_sender, NULL, client_thread, (void*)temp_client);
@@ -90,13 +89,8 @@ int main(int argc, char* argv[]) {
                 insert(&head_connected_client, temp_client);
             pthread_mutex_unlock(&mutex);
         }
-        /*
-        while(head_connected_client != NULL){
-            pthread_join(head_connected_client->client->fd_sender, NULL);
-            head_connected_client = head_connected_client->next;
-        }
+		closing_sequence(argv[1][0]);
         close(server_sock);
-        */
     }
 
     else if (strcmp(argv[1], "-c") == 0 && atoi(argv[3]) >= 1024 && atoi(argv[3]) <= 49151) {         // client's side
@@ -113,17 +107,17 @@ int main(int argc, char* argv[]) {
         create_window(&write_window, 4, start_x, start_y-4, 0);             // The write window(4 x 101) start to row: 51 and column: 0
 
         if(strlen(argv[4]) > 100){
-            write_log("Choosen name -> ERROR, check the size(0 < size < 100)", 1);
+            write_log("Choosen name -> ERROR, check the size(0 < size < 100)", 1, argv[1][0]);
         }
-        write_log("Choosen name -> OK", 0);
+        write_log("Choosen name -> OK", 0, argv[1][0]);
         strncpy(client->name, argv[4], sizeof(client->name));
 
 
         client_sock = socket(AF_INET, SOCK_STREAM, 0);
         if (client_sock < 0) {
-            write_log("Creating client socket -> ERROR", 1);
+            write_log("Creating client socket -> ERROR", 1, argv[1][0]);
         }
-        write_log("Creating client socket -> OK", 0);
+        write_log("Creating client socket -> OK", 0, argv[1][0]);
         client->sockfd = client_sock;
         memset(&server_addr, 0, sizeof(server_addr));
         server_addr.sin_family = AF_INET;
@@ -134,10 +128,10 @@ int main(int argc, char* argv[]) {
 
         if (connect(client_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
             snprintf(message_connection_log, MAX_LENGTH_MSG, "The connection doesn't happen to: %s:%s", argv[2], argv[3]);
-            write_log(message_connection_log, 1);
+            write_log(message_connection_log, 1, argv[1][0]);
         }
         snprintf(message_connection_log, MAX_LENGTH_MSG, "The connection happens to: %s:%s", argv[2], argv[3]);
-        write_log(message_connection_log, 0);
+        write_log(message_connection_log, 0, argv[1][0]);
 
 
         pthread_create(&receive_thread, NULL, get_message_from_host, (void*)client);
