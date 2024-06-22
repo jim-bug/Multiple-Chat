@@ -105,7 +105,7 @@ int main(int argc, char* argv[]) {
 
 
         if(strlen(argv[4]) > 100){
-            write_log("Choosen name -> ERROR, check the size(0 < size < 100)", 1);
+            write_log("Choosen name -> ERROR, check the size(1 < size < 100)", 1);
         }
         write_log("Choosen name -> OK", 0);
         strncpy(client->name, argv[4], sizeof(client->name));

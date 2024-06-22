@@ -129,6 +129,7 @@ void* send_message_to_host(void* arg) {
 
     } while(strcmp(client->message, "/exit") != 0);
 	closing_sequence();
+	pthread_cancel(receive_thread); 	// If I'm still getting messages and I want to close connection, I have to kill receive thread
     exit(EXIT_SUCCESS);
     return NULL;
 }
