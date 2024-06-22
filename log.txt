@@ -1,3 +1,0 @@
-Choosen name -> OK
-Creating client socket -> OK
-The connection happens to: 127.0.0.1:4870
