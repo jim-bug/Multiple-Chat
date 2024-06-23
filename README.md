@@ -52,7 +52,8 @@ bash multiple_chat.sh -c IP PORT NAME
 - **Lunghezza messaggio**: La lunghezza del messaggio deve deve compresa tra 0 e 1024.
 - **Chiusura Connessione**: Per chiudere una connessione lato client digitare: /exit.
 - **Finestre**: Per una maggiore leggibilità dei messaggi è consigliato di usare lo schermo intero.
-
+- **Comandi speciali**: Utilizza /exit per uscire dalla chat o /cls per pulire la cronologia della chat dal tuo terminale.
+- **Cronologia temporanea**: Multiple-Chat assicura la visualizzazione dei messaggi fino a quando il numero di messaggi non supera il numero massimo di righe(dipede dalla dimensione del terminale).
 ## Licenza
 Multiple-Chat ha una licenza GNU General Public License v3.0.
 
